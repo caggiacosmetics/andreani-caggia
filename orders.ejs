@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pedidos — Shopify → Andreani</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap');
+  :root {
+    --bg: #0f0f0f; --surface: #161616; --surface2: #1e1e1e;
+    --border: #2a2a2a; --border-hover: #3a3a3a;
+    --accent: #00e5a0; --accent-dim: rgba(0,229,160,0.12); --accent-glow: rgba(0,229,160,0.3);
+    --text: #f0f0f0; --text-dim: #888; --text-muted: #555;
+    --danger: #ff4d6d; --warning: #ffd166;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; min-height: 100vh; }
+
+  header {
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 0 32px; height: 60px; display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .logo { display: flex; align-items: center; gap: 12px; font-family: 'Space Mono', monospace; font-size: 14px; font-weight: 700; }
+  .logo-icon { width: 28px; height: 28px; background: var(--accent); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 14px; }
+  .logo span { color: var(--accent); }
+  .shop-badge { font-size: 12px; color: var(--text-muted); display: flex; align-items: center; gap: 12px; }
+  .shop-badge strong { color: var(--accent); }
+  .btn-sm { padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer; border: 1px solid var(--border); background: transparent; color: var(--text-dim); transition: all .2s; font-family: 'DM Sans', sans-serif; }
+  .btn-sm:hover { border-color: var(--border-hover); color: var(--text); }
+
+  main { max-width: 1100px; margin: 0 auto; padding: 32px 24px; }
+
+  .toolbar {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 20px; flex-wrap: wrap; gap: 12px;
+  }
+  .toolbar-left { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .toolbar-right { display: flex; align-items: center; gap: 10px; }
+
+  select, .filter-select {
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 12px; color: var(--text); font-family: 'DM Sans', sans-serif;
+    font-size: 13px; outline: none; cursor: pointer;
+    transition: border-color .2s;
+  }
+  select:focus { border-color: var(--accent); }
+
+  .btn-load {
+    padding: 9px 18px; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; color: var(--text-dim); font-family: 'DM Sans', sans-serif;
+    font-size: 13px; font-weight: 500; cursor: pointer; transition: all .2s;
+  }
+  .btn-load:hover { border-color: var(--accent); color: var(--accent); }
+
+  .btn-export {
+    padding: 9px 20px; background: var(--accent); border: none;
+    border-radius: 8px; color: #000; font-family: 'DM Sans', sans-serif;
+    font-size: 13px; font-weight: 600; cursor: pointer; transition: all .2s;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .btn-export:hover { background: #00ffb2; box-shadow: 0 0 16px var(--accent-glow); }
+  .btn-export:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
+
+  .count-label { font-family: 'Space Mono', monospace; font-size: 12px; color: var(--text-muted); }
+  .count-label strong { color: var(--accent); }
+
+  /* Table */
+  .table-wrap { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead tr { background: var(--surface); border-bottom: 1px solid var(--border); }
+  th { padding: 10px 14px; text-align: left; font-family: 'Space Mono', monospace; font-size: 10px; font-weight: 700; color: var(--text-muted); letter-spacing: 1px; text-transform: uppercase; white-space: nowrap; }
+  tbody tr { border-bottom: 1px solid var(--border); transition: background .15s; cursor: pointer; }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: var(--surface2); }
+  tbody tr.selected { background: var(--accent-dim); }
+  td { padding: 10px 14px; color: var(--text-dim); white-space: nowrap; }
+  td.bold { color: var(--text); font-weight: 500; }
+
+  .tag { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; font-family: 'Space Mono', monospace; }
+  .tag-unfulfilled { background: rgba(255,209,102,0.15); color: var(--warning); }
+  .tag-fulfilled { background: rgba(0,229,160,0.15); color: var(--accent); }
+  .tag-partial { background: rgba(140,140,255,0.15); color: #8c8cff; }
+  .tag-cancelled { background: rgba(255,77,109,0.15); color: var(--danger); }
+
+  input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; }
+
+  /* States */
+  .state-box {
+    text-align: center; padding: 60px 20px; color: var(--text-muted);
+  }
+  .state-box .icon { font-size: 40px; margin-bottom: 16px; }
+  .state-box p { font-size: 15px; }
+
+  .spinner { width: 20px; height: 20px; border: 2px solid var(--accent); border-top-color: transparent; border-radius: 50%; animation: spin .8s linear infinite; margin: 0 auto 16px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--surface); }
+  ::-webkit-scrollbar-thumb { background: var(--border-hover); border-radius: 3px; }
+
+  .select-all-label { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-dim); cursor: pointer; user-select: none; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">📦</div>
+    Shopify <span>→</span> Andreani
+  </div>
+  <div class="shop-badge">
+    <span>Tienda: <strong><%= shop %></strong></span>
+    <a href="/logout"><button class="btn-sm">Desconectar</button></a>
+  </div>
+</header>
+
+<main>
+  <div class="toolbar">
+    <div class="toolbar-left">
+      <select id="filter-status">
+        <option value="unfulfilled">Sin enviar</option>
+        <option value="any">Todos los estados</option>
+        <option value="fulfilled">Enviados</option>
+        <option value="partial">Parcialmente enviados</option>
+      </select>
+      <select id="filter-limit">
+        <option value="50">50 pedidos</option>
+        <option value="100" selected>100 pedidos</option>
+        <option value="250">250 pedidos</option>
+      </select>
+      <button class="btn-load" onclick="loadOrders()">↻ Cargar pedidos</button>
+      <label class="select-all-label">
+        <input type="checkbox" id="select-all" onchange="toggleAll(this.checked)">
+        Seleccionar todos
+      </label>
+    </div>
+    <div class="toolbar-right">
+      <span class="count-label"><strong id="sel-count">0</strong> seleccionados</span>
+      <button class="btn-export" id="btn-export" disabled onclick="exportCSV()">
+        ⬇ Descargar CSV Andreani
+      </button>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th></th>
+          <th>#Pedido</th>
+          <th>Cliente</th>
+          <th>Email</th>
+          <th>Dirección</th>
+          <th>Localidad</th>
+          <th>Provincia</th>
+          <th>CP</th>
+          <th>Estado</th>
+          <th>Total</th>
+        </tr>
+      </thead>
+      <tbody id="tbody">
+        <tr>
+          <td colspan="10">
+            <div class="state-box">
+              <div class="icon">📋</div>
+              <p>Hacé clic en "Cargar pedidos" para comenzar</p>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</main>
+
+<script>
+let allOrders = [];
+
+async function loadOrders() {
+  const status = document.getElementById('filter-status').value;
+  const limit = document.getElementById('filter-limit').value;
+  const tbody = document.getElementById('tbody');
+
+  tbody.innerHTML = `<tr><td colspan="10"><div class="state-box"><div class="spinner"></div><p>Cargando pedidos…</p></div></td></tr>`;
+
+  try {
+    const res = await fetch(`/api/orders?status=${status}&limit=${limit}`);
+    const data = await res.json();
+
+    if (!res.ok) throw new Error(data.error || 'Error desconocido');
+
+    allOrders = data.orders || [];
+    renderOrders(allOrders);
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="10"><div class="state-box"><p style="color:#ff4d6d">⚠ ${err.message}</p></div></td></tr>`;
+  }
+}
+
+function renderOrders(orders) {
+  const tbody = document.getElementById('tbody');
+
+  if (!orders.length) {
+    tbody.innerHTML = `<tr><td colspan="10"><div class="state-box"><div class="icon">🎉</div><p>No hay pedidos con ese filtro</p></div></td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = orders.map((o, i) => {
+    const addr = o.shipping_address || o.billing_address || {};
+    const nombre = `${addr.first_name || o.customer?.first_name || ''} ${addr.last_name || o.customer?.last_name || ''}`.trim();
+    const email = o.email || o.customer?.email || '—';
+    const calle = addr.address1 || '—';
+    const ciudad = addr.city || '—';
+    const provincia = addr.province || '—';
+    const cp = addr.zip || '—';
+    const status = o.fulfillment_status || 'unfulfilled';
+    const total = `$${parseFloat(o.total_price || 0).toLocaleString('es-AR')}`;
+
+    return `
+      <tr data-index="${i}" onclick="toggleRow(this)">
+        <td><input type="checkbox" class="cb" data-index="${i}" onclick="event.stopPropagation();toggleRow(this.closest('tr'))" /></td>
+        <td class="bold">#${o.order_number}</td>
+        <td>${nombre || '—'}</td>
+        <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis">${email}</td>
+        <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis">${calle}</td>
+        <td>${ciudad}</td>
+        <td>${provincia}</td>
+        <td>${cp}</td>
+        <td><span class="tag tag-${status === 'fulfilled' ? 'fulfilled' : status === 'partial' ? 'partial' : status === 'cancelled' ? 'cancelled' : 'unfulfilled'}">${status}</span></td>
+        <td>${total}</td>
+      </tr>`;
+  }).join('');
+
+  updateCount();
+}
+
+function toggleRow(tr) {
+  const cb = tr.querySelector('.cb');
+  cb.checked = !cb.checked;
+  tr.classList.toggle('selected', cb.checked);
+  updateCount();
+}
+
+function toggleAll(checked) {
+  document.querySelectorAll('.cb').forEach(cb => {
+    cb.checked = checked;
+    cb.closest('tr').classList.toggle('selected', checked);
+  });
+  updateCount();
+}
+
+function updateCount() {
+  const count = document.querySelectorAll('.cb:checked').length;
+  document.getElementById('sel-count').textContent = count;
+  document.getElementById('btn-export').disabled = count === 0;
+}
+
+async function exportCSV() {
+  const selected = [];
+  document.querySelectorAll('.cb:checked').forEach(cb => {
+    selected.push(allOrders[parseInt(cb.dataset.index)]);
+  });
+
+  if (!selected.length) return;
+
+  const res = await fetch('/api/generate-csv', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ orders: selected })
+  });
+
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `andreani_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+</script>
+</body>
+</html>

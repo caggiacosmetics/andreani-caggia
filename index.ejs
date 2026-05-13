@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shopify → Andreani</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap');
+  :root {
+    --bg: #0f0f0f; --surface: #161616; --surface2: #1e1e1e;
+    --border: #2a2a2a; --accent: #00e5a0; --accent-dim: rgba(0,229,160,0.12);
+    --accent-glow: rgba(0,229,160,0.3); --text: #f0f0f0; --text-dim: #888;
+    --text-muted: #555; --danger: #ff4d6d;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; min-height: 100vh; display: flex; flex-direction: column; }
+  
+  header {
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 0 32px; height: 60px; display: flex; align-items: center; justify-content: space-between;
+  }
+  .logo { display: flex; align-items: center; gap: 12px; font-family: 'Space Mono', monospace; font-size: 14px; font-weight: 700; }
+  .logo-icon { width: 28px; height: 28px; background: var(--accent); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 14px; }
+  .logo span { color: var(--accent); }
+
+  main { flex: 1; display: flex; align-items: center; justify-content: center; padding: 40px 24px; }
+
+  .card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+    padding: 48px 40px; max-width: 440px; width: 100%; text-align: center;
+  }
+  .card-icon { font-size: 48px; margin-bottom: 24px; }
+  .card h1 { font-size: 24px; font-weight: 600; margin-bottom: 8px; }
+  .card p { color: var(--text-dim); font-size: 15px; line-height: 1.6; margin-bottom: 32px; }
+
+  .form-field { margin-bottom: 16px; text-align: left; }
+  label { display: block; font-size: 12px; font-weight: 500; color: var(--text-dim); margin-bottom: 6px; }
+  input {
+    width: 100%; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 12px 14px; color: var(--text);
+    font-family: 'DM Sans', sans-serif; font-size: 14px; outline: none;
+    transition: border-color .2s, box-shadow .2s;
+  }
+  input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
+  input::placeholder { color: var(--text-muted); }
+
+  .btn-primary {
+    width: 100%; padding: 13px; background: var(--accent); color: #000;
+    border: none; border-radius: 8px; font-family: 'DM Sans', sans-serif;
+    font-size: 15px; font-weight: 600; cursor: pointer; transition: all .2s;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .btn-primary:hover { background: #00ffb2; box-shadow: 0 0 24px var(--accent-glow); }
+
+  .features { display: flex; flex-direction: column; gap: 10px; margin-bottom: 32px; text-align: left; }
+  .feature { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--text-dim); }
+  .feature-dot { width: 6px; height: 6px; background: var(--accent); border-radius: 50%; flex-shrink: 0; }
+
+  .error-msg {
+    background: rgba(255,77,109,0.1); border: 1px solid rgba(255,77,109,0.3);
+    color: var(--danger); border-radius: 8px; padding: 12px 16px;
+    font-size: 13px; margin-bottom: 20px;
+  }
+
+  .already-auth {
+    background: var(--accent-dim); border: 1px solid rgba(0,229,160,0.3);
+    color: var(--accent); border-radius: 8px; padding: 12px 16px;
+    font-size: 13px; margin-bottom: 20px;
+  }
+  .already-auth a { color: var(--accent); font-weight: 600; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">
+    <div class="logo-icon">📦</div>
+    Shopify <span>→</span> Andreani
+  </div>
+</header>
+
+<main>
+  <div class="card">
+    <div class="card-icon">🚚</div>
+    <h1>Exportar pedidos a Andreani</h1>
+    <p>Conectá tu tienda Shopify y generá el CSV listo para importar en Andreani en segundos.</p>
+
+    <% if (authenticated) { %>
+    <div class="already-auth">
+      ✓ Ya conectada con <strong><%= shop %></strong> — <a href="/orders">Ver pedidos →</a>
+    </div>
+    <% } %>
+
+    <% if (locals.error) { %>
+    <div class="error-msg">⚠ Error al conectar. Verificá el dominio e intentá de nuevo.</div>
+    <% } %>
+
+    <div class="features">
+      <div class="feature"><div class="feature-dot"></div>Sin configuración — conectás con un clic</div>
+      <div class="feature"><div class="feature-dot"></div>Tus datos nunca se almacenan en ningún servidor</div>
+      <div class="feature"><div class="feature-dot"></div>CSV en el formato exacto de Andreani</div>
+    </div>
+
+    <form method="POST" action="/auth">
+      <div class="form-field">
+        <label>Dominio de tu tienda Shopify</label>
+        <input type="text" name="shop" placeholder="mi-tienda.myshopify.com" required />
+      </div>
+      <button type="submit" class="btn-primary">
+        🔐 Conectar con Shopify
+      </button>
+    </form>
+  </div>
+</main>
+</body>
+</html>
