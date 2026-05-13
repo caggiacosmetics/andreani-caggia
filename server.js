@@ -13,9 +13,9 @@ app.set('views', [path.join(__dirname, 'views'), path.join(__dirname)]);
 
 app.use(session({
   secret: process.env.SESSION_SECRET || 'shopify-andreani-secret-2024',
-  resave: false,
+  resave: true,
   saveUninitialized: true,
-  cookie: { secure: false }
+  cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000 }
 }));
 
 const SHOPIFY_API_KEY = process.env.SHOPIFY_API_KEY;
@@ -35,17 +35,28 @@ app.post('/auth', (req, res) => {
   const state = crypto.randomBytes(16).toString('hex');
   req.session.state = state;
   req.session.shop = shop;
-  const redirectUri = `${HOST}/auth/callback`;
-  const authUrl = `https://${shop}/admin/oauth/authorize?client_id=${SHOPIFY_API_KEY}&scope=${SCOPES}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}`;
-  res.redirect(authUrl);
+  req.session.save(() => {
+    const redirectUri = `${HOST}/auth/callback`;
+    const authUrl = `https://${shop}/admin/oauth/authorize?client_id=${SHOPIFY_API_KEY}&scope=${SCOPES}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}`;
+    res.redirect(authUrl);
+  });
 });
 
 app.get('/auth/callback', async (req, res) => {
-  const { code, state, shop, hmac } = req.query;
-  if (state !== req.session.state) return res.status(403).send('State mismatch.');
-  const params = Object.keys(req.query).filter(k => k !== 'hmac').sort().map(k => `${k}=${req.query[k]}`).join('&');
+  const { code, shop, hmac } = req.query;
+
+  // Verificar HMAC
+  const params = Object.keys(req.query)
+    .filter(k => k !== 'hmac')
+    .sort()
+    .map(k => `${k}=${req.query[k]}`)
+    .join('&');
   const digest = crypto.createHmac('sha256', SHOPIFY_API_SECRET).update(params).digest('hex');
-  if (digest !== hmac) return res.status(403).send('HMAC invalido.');
+  if (digest !== hmac) {
+    console.error('HMAC mismatch. Expected:', digest, 'Got:', hmac);
+    return res.status(403).send('HMAC invalido. Intenta de nuevo desde <a href="/">la pagina principal</a>.');
+  }
+
   try {
     const response = await axios.post(`https://${shop}/admin/oauth/access_token`, {
       client_id: SHOPIFY_API_KEY,
@@ -54,7 +65,7 @@ app.get('/auth/callback', async (req, res) => {
     });
     req.session.accessToken = response.data.access_token;
     req.session.shop = shop;
-    res.redirect('/orders');
+    req.session.save(() => res.redirect('/orders'));
   } catch (err) {
     console.error(err.response?.data || err.message);
     res.redirect('/?error=token_failed');
