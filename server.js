@@ -23,52 +23,25 @@ const SHOPIFY_API_SECRET = process.env.SHOPIFY_API_SECRET;
 const SCOPES = 'read_orders,read_customers';
 const HOST = process.env.HOST || 'http://localhost:3000';
 
-// Mapa de códigos de provincia Shopify → nombre completo Andreani
 const PROVINCIAS = {
-  'A': 'SALTA',
-  'B': 'BUENOS AIRES',
-  'C': 'CIUDAD AUTONOMA DE BUENOS AIRES',
-  'D': 'SAN LUIS',
-  'E': 'ENTRE RIOS',
-  'F': 'LA RIOJA',
-  'G': 'SANTIAGO DEL ESTERO',
-  'H': 'CHACO',
-  'J': 'SAN JUAN',
-  'K': 'CATAMARCA',
-  'L': 'LA PAMPA',
-  'M': 'MENDOZA',
-  'N': 'MISIONES',
-  'P': 'FORMOSA',
-  'Q': 'NEUQUEN',
-  'R': 'RIO NEGRO',
-  'S': 'SANTA FE',
-  'T': 'TUCUMAN',
-  'U': 'CHUBUT',
-  'V': 'TIERRA DEL FUEGO',
-  'W': 'CORRIENTES',
-  'X': 'CORDOBA',
-  'Y': 'JUJUY',
-  'Z': 'SANTA CRUZ'
+  'A': 'SALTA', 'B': 'BUENOS AIRES', 'C': 'CIUDAD AUTONOMA DE BUENOS AIRES',
+  'D': 'SAN LUIS', 'E': 'ENTRE RIOS', 'F': 'LA RIOJA',
+  'G': 'SANTIAGO DEL ESTERO', 'H': 'CHACO', 'J': 'SAN JUAN',
+  'K': 'CATAMARCA', 'L': 'LA PAMPA', 'M': 'MENDOZA',
+  'N': 'MISIONES', 'P': 'FORMOSA', 'Q': 'NEUQUEN',
+  'R': 'RIO NEGRO', 'S': 'SANTA FE', 'T': 'TUCUMAN',
+  'U': 'CHUBUT', 'V': 'TIERRA DEL FUEGO', 'W': 'CORRIENTES',
+  'X': 'CORDOBA', 'Y': 'JUJUY', 'Z': 'SANTA CRUZ'
 };
 
-// Parsea teléfono → { codigo, numero }
 function parseTelefono(raw) {
   if (!raw) return { codigo: '', numero: '' };
-  // Limpiar: sacar todo excepto dígitos
   let digits = String(raw).replace(/\D/g, '');
-  // Si empieza con 549 (formato internacional AR con celular)
   if (digits.startsWith('549')) digits = digits.slice(3);
-  // Si empieza con 54 (formato internacional AR)
   else if (digits.startsWith('54')) digits = digits.slice(2);
-  // Si empieza con 0, sacar el 0
   if (digits.startsWith('0')) digits = digits.slice(1);
-  // Los primeros 2-4 dígitos son el código de área
-  // Códigos de 4 dígitos: el número tiene 6 dígitos → ej: 2944 + 550608
-  // Códigos de 3 dígitos: el número tiene 7 dígitos → ej: 011 + 4567890
-  // Códigos de 2 dígitos: el número tiene 8 dígitos → ej: 11 + 45678901
   let codigo = '', numero = '';
   if (digits.length === 10) {
-    // Número celular estándar argentino
     if (['11','15'].includes(digits.slice(0,2))) {
       codigo = '011'; numero = digits.slice(2);
     } else {
@@ -82,19 +55,15 @@ function parseTelefono(raw) {
   return { codigo, numero };
 }
 
-// Parsea address1 → { calle, numero, piso, depto }
 function parseAddress(address1, address2) {
   let calle = '', numero = '', piso = '', depto = '';
   const a1 = address1 || '';
   const a2 = address2 || '';
-
-  // Buscar número en address1: "Calle 1234" o "Calle 1234 Piso 2 Depto A"
   const matchNum = a1.match(/^(.*?)\s+(\d+[a-zA-Z]?)(?:\s+(.*))?$/);
   if (matchNum) {
     calle = matchNum[1].trim();
     numero = matchNum[2].trim();
     const resto = matchNum[3] || '';
-    // Buscar piso/depto en el resto de address1
     const pisoMatch = resto.match(/[Pp]iso\s*(\w+)/);
     const deptoMatch = resto.match(/[Dd]pto\.?\s*([A-Za-z0-9]+)/);
     if (pisoMatch) piso = pisoMatch[1];
@@ -102,15 +71,12 @@ function parseAddress(address1, address2) {
   } else {
     calle = a1.trim();
   }
-
-  // Si no encontró piso/depto, buscar en address2
   if (!piso || !depto) {
     const pisoMatch2 = a2.match(/[Pp]iso\s*(\w+)/);
     const deptoMatch2 = a2.match(/[Dd]pto\.?\s*([A-Za-z0-9]+)/);
     if (pisoMatch2 && !piso) piso = pisoMatch2[1];
     if (deptoMatch2 && !depto) depto = deptoMatch2[1];
   }
-
   return { calle, numero, piso, depto };
 }
 
@@ -170,53 +136,43 @@ app.get('/api/orders', async (req, res) => {
 
 app.post('/api/generate-xlsx', async (req, res) => {
   if (!req.session.accessToken) return res.status(401).json({ error: 'No autenticado' });
-  const { orders } = req.body;
+  const { orders, peso, alto, ancho, profundidad } = req.body;
   if (!orders || !orders.length) return res.status(400).json({ error: 'No hay pedidos' });
+
+  // Valores de medidas enviados desde el frontend
+  const pesoVal = parseFloat(peso) || 200;
+  const altoVal = parseFloat(alto) || 10;
+  const anchoVal = parseFloat(ancho) || 10;
+  const profVal = parseFloat(profundidad) || 3;
 
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('A domicilio');
 
-  // Fila 1: grupos de encabezado (igual a la planilla de Andreani)
+  // Fila 1: grupos
   sheet.mergeCells('A1:G1'); sheet.getCell('A1').value = 'Características';
   sheet.mergeCells('H1:M1'); sheet.getCell('H1').value = 'Destinatario';
   sheet.mergeCells('N1:R1'); sheet.getCell('N1').value = 'Domicilio destino';
   sheet.getCell('S1').value = 'Observaciones';
 
-  // Estilo fila 1
   ['A1','H1','N1','S1'].forEach(cell => {
     sheet.getCell(cell).font = { bold: true, color: { argb: 'FFFFFFFF' } };
     sheet.getCell(cell).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F4E79' } };
     sheet.getCell(cell).alignment = { horizontal: 'center' };
   });
 
-  // Fila 2: columnas exactas de Andreani
+  // Fila 2: encabezados
   const headers = [
-    'Paquete Guardado',      // A - col 1
-    'Peso (grs)',             // B - col 2
-    'Alto (cm)',              // C - col 3
-    'Ancho (cm)',             // D - col 4
-    'Profundidad (cm)',       // E - col 5
-    'Valor declarado ($ C/IVA)', // F - col 6
-    'Numero Interno',         // G - col 7
-    'Nombre',                 // H - col 8
-    'Apellido',               // I - col 9
-    'DNI',                    // J - col 10
-    'Email',                  // K - col 11
-    'Celular código',         // L - col 12
-    'Celular número',         // M - col 13
-    'Calle',                  // N - col 14
-    'Número',                 // O - col 15
-    'Piso',                   // P - col 16
-    'Departamento',           // Q - col 17
-    'Provincia / Localidad / CP', // R - col 18
-    'Observaciones'           // S - col 19
+    'Paquete Guardado', 'Peso (grs)', 'Alto (cm)', 'Ancho (cm)',
+    'Profundidad (cm)', 'Valor declarado ($ C/IVA)', 'Numero Interno',
+    'Nombre', 'Apellido', 'DNI', 'Email', 'Celular código', 'Celular número',
+    'Calle', 'Número', 'Piso', 'Departamento', 'Provincia / Localidad / CP', 'Observaciones'
   ];
 
   const headerRow = sheet.getRow(2);
   headers.forEach((h, i) => {
     const cell = headerRow.getCell(i + 1);
     cell.value = h;
-    cell.font = { bold: true, color: { argb: 'FF000000' } };
+    cell.font = { bold: true };
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9E1F2' } };
     cell.alignment = { horizontal: 'center', wrapText: true };
     cell.border = {
@@ -226,8 +182,7 @@ app.post('/api/generate-xlsx', async (req, res) => {
   });
   headerRow.height = 35;
 
-  // Anchos de columna
-  const colWidths = [18, 12, 10, 10, 14, 22, 15, 15, 15, 12, 28, 14, 16, 22, 10, 8, 12, 35, 20];
+  const colWidths = [18,12,10,10,14,22,15,15,15,12,28,14,16,22,10,8,12,35,20];
   colWidths.forEach((w, i) => { sheet.getColumn(i + 1).width = w; });
 
   // Datos
@@ -241,21 +196,18 @@ app.post('/api/generate-xlsx', async (req, res) => {
     const cp = (addr.zip || '').replace(/'/g, '').trim();
     const provinciaLocalidadCP = `${provinciaNombre} / ${localidad} / ${cp}`;
 
-    const nombre = addr.first_name || o.customer?.first_name || '';
-    const apellido = addr.last_name || o.customer?.last_name || '';
-
     const dataRow = sheet.getRow(idx + 3);
     const values = [
       'PAQUETE',
-200,          // Peso en gramos
-10,           // Alto
-10,           // Ancho
-3,            // Profundidad
+      pesoVal,
+      altoVal,
+      anchoVal,
+      profVal,
       parseFloat(o.total_price) || '',
       String(o.order_number || '').replace('#', ''),
-      nombre,
-      apellido,
-      '',           // DNI - no disponible en Shopify
+      addr.first_name || o.customer?.first_name || '',
+      addr.last_name || o.customer?.last_name || '',
+      '',
       o.email || o.customer?.email || '',
       tel.codigo,
       tel.numero,
@@ -264,7 +216,7 @@ app.post('/api/generate-xlsx', async (req, res) => {
       piso,
       depto,
       provinciaLocalidadCP,
-      ''            // Observaciones
+      ''
     ];
 
     values.forEach((v, i) => {
@@ -277,7 +229,6 @@ app.post('/api/generate-xlsx', async (req, res) => {
         left: { style: 'thin', color: { argb: 'FFD0D0D0' } },
         right: { style: 'thin', color: { argb: 'FFD0D0D0' } }
       };
-      // Fila alternada
       if (idx % 2 === 1) {
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF5F5F5' } };
       }
@@ -292,7 +243,6 @@ app.post('/api/generate-xlsx', async (req, res) => {
   res.end();
 });
 
-// Mantener el endpoint CSV viejo por compatibilidad
 app.post('/api/generate-csv', (req, res) => {
   res.redirect(307, '/api/generate-xlsx');
 });
