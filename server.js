@@ -1,6 +1,8 @@
 const express = require('express');
+const crypto = require('crypto');
 const axios = require('axios');
 const path = require('path');
+const session = require('express-session');
 
 const app = express();
 app.use(express.json());
@@ -9,26 +11,70 @@ app.use(express.static('public'));
 app.set('view engine', 'ejs');
 app.set('views', [path.join(__dirname, 'views'), path.join(__dirname)]);
 
-const SHOPIFY_SHOP = process.env.SHOPIFY_SHOP || 'caggia-cosmetics.myshopify.com';
-const SHOPIFY_ACCESS_TOKEN = process.env.SHOPIFY_ACCESS_TOKEN;
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'shopify-andreani-secret-2024',
+  resave: false,
+  saveUninitialized: true,
+  cookie: { secure: false }
+}));
+
+const SHOPIFY_API_KEY = process.env.SHOPIFY_API_KEY;
+const SHOPIFY_API_SECRET = process.env.SHOPIFY_API_SECRET;
+const SCOPES = 'read_orders,read_customers';
+const HOST = process.env.HOST || 'http://localhost:3000';
 
 app.get('/', (req, res) => {
-  res.render('index', { shop: SHOPIFY_SHOP, authenticated: !!SHOPIFY_ACCESS_TOKEN });
+  const shop = req.session.shop;
+  const token = req.session.accessToken;
+  res.render('index', { shop, authenticated: !!(shop && token) });
+});
+
+app.post('/auth', (req, res) => {
+  const shop = req.body.shop?.trim().replace('https://', '').replace('http://', '').replace(/\/$/, '');
+  if (!shop) return res.redirect('/?error=missing_shop');
+  const state = crypto.randomBytes(16).toString('hex');
+  req.session.state = state;
+  req.session.shop = shop;
+  const redirectUri = `${HOST}/auth/callback`;
+  const authUrl = `https://${shop}/admin/oauth/authorize?client_id=${SHOPIFY_API_KEY}&scope=${SCOPES}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}`;
+  res.redirect(authUrl);
+});
+
+app.get('/auth/callback', async (req, res) => {
+  const { code, state, shop, hmac } = req.query;
+  if (state !== req.session.state) return res.status(403).send('State mismatch.');
+  const params = Object.keys(req.query).filter(k => k !== 'hmac').sort().map(k => `${k}=${req.query[k]}`).join('&');
+  const digest = crypto.createHmac('sha256', SHOPIFY_API_SECRET).update(params).digest('hex');
+  if (digest !== hmac) return res.status(403).send('HMAC invalido.');
+  try {
+    const response = await axios.post(`https://${shop}/admin/oauth/access_token`, {
+      client_id: SHOPIFY_API_KEY,
+      client_secret: SHOPIFY_API_SECRET,
+      code
+    });
+    req.session.accessToken = response.data.access_token;
+    req.session.shop = shop;
+    res.redirect('/orders');
+  } catch (err) {
+    console.error(err.response?.data || err.message);
+    res.redirect('/?error=token_failed');
+  }
 });
 
 app.get('/orders', (req, res) => {
-  if (!SHOPIFY_ACCESS_TOKEN) return res.redirect('/');
-  res.render('orders', { shop: SHOPIFY_SHOP });
+  if (!req.session.accessToken) return res.redirect('/');
+  res.render('orders', { shop: req.session.shop });
 });
 
 app.get('/api/orders', async (req, res) => {
-  if (!SHOPIFY_ACCESS_TOKEN) return res.status(401).json({ error: 'No configurado' });
+  if (!req.session.accessToken) return res.status(401).json({ error: 'No autenticado' });
+  const { shop, accessToken } = req.session;
   const status = req.query.status || 'unfulfilled';
   const limit = req.query.limit || 100;
   try {
     const response = await axios.get(
-      `https://${SHOPIFY_SHOP}/admin/api/2024-04/orders.json?status=any&fulfillment_status=${status}&limit=${limit}`,
-      { headers: { 'X-Shopify-Access-Token': SHOPIFY_ACCESS_TOKEN } }
+      `https://${shop}/admin/api/2024-04/orders.json?status=any&fulfillment_status=${status}&limit=${limit}`,
+      { headers: { 'X-Shopify-Access-Token': accessToken } }
     );
     res.json(response.data);
   } catch (err) {
@@ -38,6 +84,7 @@ app.get('/api/orders', async (req, res) => {
 });
 
 app.post('/api/generate-csv', (req, res) => {
+  if (!req.session.accessToken) return res.status(401).json({ error: 'No autenticado' });
   const { orders } = req.body;
   if (!orders || !orders.length) return res.status(400).json({ error: 'No hay pedidos' });
   const headers = ['NombreDestinatario','ApellidoDestinatario','EmailDestinatario','TelefonoDestinatario','CalleDestinatario','NumeroDestinatario','PisoDestinatario','DeptoDestinatario','LocalidadDestinatario','ProvinciaDestinatario','CodigoPostalDestinatario','NumeroPedido','PesoKg','AltoC','AnchoC','ProfundidadC','ValorDeclarado'];
@@ -70,6 +117,8 @@ app.post('/api/generate-csv', (req, res) => {
   res.setHeader('Content-Disposition', `attachment; filename="andreani_${new Date().toISOString().slice(0,10)}.csv"`);
   res.send(csv);
 });
+
+app.get('/logout', (req, res) => { req.session.destroy(); res.redirect('/'); });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Servidor corriendo en puerto ${PORT}`));
