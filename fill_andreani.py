@@ -58,7 +58,7 @@ def parse_addr(a1, a2):
         piso = re.search(r'[Pp]iso\s*(\w+)', resto) or re.search(r'[Pp]iso\s*(\w+)', a2)
         depto = re.search(r'[Dd]pto\.?\s*([A-Za-z0-9]+)', resto) or re.search(r'[Dd]pto\.?\s*([A-Za-z0-9]+)', a2)
         return calle, num, piso.group(1) if piso else '', depto.group(1) if depto else ''
-    return a1.strip(), 'S/N', '', ''
+    return a1.strip(), '0', '', ''
 
 wb = openpyxl.load_workbook(os.path.join(os.path.dirname(__file__), 'plantilla_andreani (1).xlsx'))
 ws = wb['A domicilio']
