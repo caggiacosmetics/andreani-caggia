@@ -247,10 +247,10 @@ app.post('/api/generate-xlsx', async (req, res) => {
     const dataRow = sheet.getRow(idx + 3);
     const values = [
       'PAQUETE',
-      '',           // Peso - completar manualmente
-      '',           // Alto
-      '',           // Ancho
-      '',           // Profundidad
+200,          // Peso en gramos
+10,           // Alto
+10,           // Ancho
+3,            // Profundidad
       parseFloat(o.total_price) || '',
       String(o.order_number || '').replace('#', ''),
       nombre,
