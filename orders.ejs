@@ -29,20 +29,41 @@
   .btn-sm { padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer; border: 1px solid var(--border); background: transparent; color: var(--text-dim); transition: all .2s; font-family: 'DM Sans', sans-serif; }
   .btn-sm:hover { border-color: var(--border-hover); color: var(--text); }
 
-  main { max-width: 1100px; margin: 0 auto; padding: 32px 24px; }
+  main { max-width: 1100px; margin: 0 auto; padding: 24px 24px; }
+
+  /* MEDIDAS PANEL */
+  .medidas-panel {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    padding: 16px 20px; margin-bottom: 20px;
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  }
+  .medidas-label {
+    font-family: 'Space Mono', monospace; font-size: 11px; font-weight: 700;
+    color: var(--accent); letter-spacing: 1px; text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .medidas-fields { display: flex; gap: 12px; flex-wrap: wrap; flex: 1; }
+  .medida-field { display: flex; flex-direction: column; gap: 4px; }
+  .medida-field label { font-size: 11px; color: var(--text-muted); }
+  .medida-field input {
+    width: 90px; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 6px; padding: 7px 10px; color: var(--text);
+    font-family: 'DM Sans', sans-serif; font-size: 13px; outline: none;
+    transition: border-color .2s;
+  }
+  .medida-field input:focus { border-color: var(--accent); }
 
   .toolbar {
     display: flex; align-items: center; justify-content: space-between;
-    margin-bottom: 20px; flex-wrap: wrap; gap: 12px;
+    margin-bottom: 16px; flex-wrap: wrap; gap: 12px;
   }
   .toolbar-left { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
   .toolbar-right { display: flex; align-items: center; gap: 10px; }
 
-  select, .filter-select {
+  select {
     background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
     padding: 8px 12px; color: var(--text); font-family: 'DM Sans', sans-serif;
-    font-size: 13px; outline: none; cursor: pointer;
-    transition: border-color .2s;
+    font-size: 13px; outline: none; cursor: pointer; transition: border-color .2s;
   }
   select:focus { border-color: var(--accent); }
 
@@ -65,7 +86,6 @@
   .count-label { font-family: 'Space Mono', monospace; font-size: 12px; color: var(--text-muted); }
   .count-label strong { color: var(--accent); }
 
-  /* Table */
   .table-wrap { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
   thead tr { background: var(--surface); border-bottom: 1px solid var(--border); }
@@ -85,10 +105,7 @@
 
   input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; }
 
-  /* States */
-  .state-box {
-    text-align: center; padding: 60px 20px; color: var(--text-muted);
-  }
+  .state-box { text-align: center; padding: 60px 20px; color: var(--text-muted); }
   .state-box .icon { font-size: 40px; margin-bottom: 16px; }
   .state-box p { font-size: 15px; }
 
@@ -116,6 +133,33 @@
 </header>
 
 <main>
+
+  <!-- PANEL DE MEDIDAS -->
+  <div class="medidas-panel">
+    <div class="medidas-label">📏 Medidas del paquete</div>
+    <div class="medidas-fields">
+      <div class="medida-field">
+        <label>Peso (gramos)</label>
+        <input type="number" id="peso" value="200" min="1" placeholder="200">
+      </div>
+      <div class="medida-field">
+        <label>Alto (cm)</label>
+        <input type="number" id="alto" value="10" min="1" placeholder="10">
+      </div>
+      <div class="medida-field">
+        <label>Ancho (cm)</label>
+        <input type="number" id="ancho" value="10" min="1" placeholder="10">
+      </div>
+      <div class="medida-field">
+        <label>Profundidad (cm)</label>
+        <input type="number" id="profundidad" value="3" min="1" placeholder="3">
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--text-muted);max-width:200px;line-height:1.4;">
+      Estas medidas se aplican a todos los pedidos exportados
+    </div>
+  </div>
+
   <div class="toolbar">
     <div class="toolbar-left">
       <select id="filter-status">
@@ -137,8 +181,8 @@
     </div>
     <div class="toolbar-right">
       <span class="count-label"><strong id="sel-count">0</strong> seleccionados</span>
-      <button class="btn-export" id="btn-export" disabled onclick="exportCSV()">
-        ⬇ Descargar CSV Andreani
+      <button class="btn-export" id="btn-export" disabled onclick="exportXLSX()">
+        ⬇ Descargar Excel Andreani
       </button>
     </div>
   </div>
@@ -186,9 +230,7 @@ async function loadOrders() {
   try {
     const res = await fetch(`/api/orders?status=${status}&limit=${limit}`);
     const data = await res.json();
-
     if (!res.ok) throw new Error(data.error || 'Error desconocido');
-
     allOrders = data.orders || [];
     renderOrders(allOrders);
   } catch (err) {
@@ -198,12 +240,10 @@ async function loadOrders() {
 
 function renderOrders(orders) {
   const tbody = document.getElementById('tbody');
-
   if (!orders.length) {
     tbody.innerHTML = `<tr><td colspan="10"><div class="state-box"><div class="icon">🎉</div><p>No hay pedidos con ese filtro</p></div></td></tr>`;
     return;
   }
-
   tbody.innerHTML = orders.map((o, i) => {
     const addr = o.shipping_address || o.billing_address || {};
     const nombre = `${addr.first_name || o.customer?.first_name || ''} ${addr.last_name || o.customer?.last_name || ''}`.trim();
@@ -214,7 +254,6 @@ function renderOrders(orders) {
     const cp = addr.zip || '—';
     const status = o.fulfillment_status || 'unfulfilled';
     const total = `$${parseFloat(o.total_price || 0).toLocaleString('es-AR')}`;
-
     return `
       <tr data-index="${i}" onclick="toggleRow(this)">
         <td><input type="checkbox" class="cb" data-index="${i}" onclick="event.stopPropagation();toggleRow(this.closest('tr'))" /></td>
@@ -229,7 +268,6 @@ function renderOrders(orders) {
         <td>${total}</td>
       </tr>`;
   }).join('');
-
   updateCount();
 }
 
@@ -254,18 +292,22 @@ function updateCount() {
   document.getElementById('btn-export').disabled = count === 0;
 }
 
-async function exportCSV() {
+async function exportXLSX() {
   const selected = [];
   document.querySelectorAll('.cb:checked').forEach(cb => {
     selected.push(allOrders[parseInt(cb.dataset.index)]);
   });
-
   if (!selected.length) return;
 
-  const res = await fetch('/api/generate-xlsx, {
+  const peso = document.getElementById('peso').value || 200;
+  const alto = document.getElementById('alto').value || 10;
+  const ancho = document.getElementById('ancho').value || 10;
+  const profundidad = document.getElementById('profundidad').value || 3;
+
+  const res = await fetch('/api/generate-xlsx', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ orders: selected })
+    body: JSON.stringify({ orders: selected, peso, alto, ancho, profundidad })
   });
 
   const blob = await res.blob();
