@@ -1,0 +1,13 @@
+name = "andreani claude"
+client_id = "a53c36d2f7fdc6858dc20b1432f8af0c"
+application_url = "https://andreani-caggia.onrender.com"
+embedded = false
+
+[access_scopes]
+scopes = "read_orders,read_customers"
+
+[auth]
+redirect_urls = ["https://andreani-caggia.onrender.com/auth/callback"]
+
+[webhooks]
+api_version = "2024-04"
