@@ -3,6 +3,7 @@ const axios = require('axios');
 const path = require('path');
 const session = require('express-session');
 const ExcelJS = require('exceljs');
+const LOCALIDADES_ANDREANI = require('./localidades_andreani.json');
 
 const app = express();
 app.use(express.json());
@@ -25,14 +26,42 @@ const HOST = process.env.HOST || 'http://localhost:3000';
 
 const PROVINCIAS = {
   'A': 'SALTA', 'B': 'BUENOS AIRES', 'C': 'CIUDAD AUTONOMA DE BUENOS AIRES',
-  'D': 'SAN LUIS', 'E': 'ENTRE RIOS', 'F': 'LA RIOJA',
-  'G': 'SANTIAGO DEL ESTERO', 'H': 'CHACO', 'J': 'SAN JUAN',
-  'K': 'CATAMARCA', 'L': 'LA PAMPA', 'M': 'MENDOZA',
-  'N': 'MISIONES', 'P': 'FORMOSA', 'Q': 'NEUQUEN',
-  'R': 'RIO NEGRO', 'S': 'SANTA FE', 'T': 'TUCUMAN',
-  'U': 'CHUBUT', 'V': 'TIERRA DEL FUEGO', 'W': 'CORRIENTES',
+  'D': 'SAN LUIS', 'E': 'ENTRE RIOS', 'F': 'LA RIOJA', 'G': 'SANTIAGO DEL ESTERO',
+  'H': 'CHACO', 'J': 'SAN JUAN', 'K': 'CATAMARCA', 'L': 'LA PAMPA', 'M': 'MENDOZA',
+  'N': 'MISIONES', 'P': 'FORMOSA', 'Q': 'NEUQUEN', 'R': 'RIO NEGRO', 'S': 'SANTA FE',
+  'T': 'TUCUMAN', 'U': 'CHUBUT', 'V': 'TIERRA DEL FUEGO', 'W': 'CORRIENTES',
   'X': 'CORDOBA', 'Y': 'JUJUY', 'Z': 'SANTA CRUZ'
 };
+
+// Mapa de búsqueda rápida por "PROV|LOC|CP" y "PROV|CP"
+const LOCALIDADES_MAP = {};
+LOCALIDADES_ANDREANI.forEach(l => {
+  const parts = l.split(' / ');
+  if (parts.length === 3) {
+    const [prov, loc, cp] = parts;
+    const cpNum = cp.replace(/[^0-9]/g, '');
+    LOCALIDADES_MAP[`${prov}|${loc}|${cpNum}`] = l;
+    if (!LOCALIDADES_MAP[`${prov}|${cpNum}`]) {
+      LOCALIDADES_MAP[`${prov}|${cpNum}`] = l;
+    }
+  }
+});
+
+function buscarLocalidadAndreani(provinciaCode, ciudad, zip) {
+  const prov = PROVINCIAS[provinciaCode.toUpperCase()] || provinciaCode.toUpperCase();
+  const loc = ciudad.toUpperCase().trim();
+  const cpNum = zip.replace(/[^0-9]/g, '').slice(0, 4);
+
+  // Intento 1: provincia + localidad + CP exacto
+  if (LOCALIDADES_MAP[`${prov}|${loc}|${cpNum}`]) return LOCALIDADES_MAP[`${prov}|${loc}|${cpNum}`];
+  // Intento 2: provincia + CP
+  if (LOCALIDADES_MAP[`${prov}|${cpNum}`]) return LOCALIDADES_MAP[`${prov}|${cpNum}`];
+  // Intento 3: buscar cualquier entrada con ese CP
+  const found = LOCALIDADES_ANDREANI.find(l => l.split(' / ')[2]?.replace(/[^0-9]/g, '') === cpNum);
+  if (found) return found;
+  // Fallback
+  return `${prov} / ${loc} / ${cpNum}`;
+}
 
 function parseTelefono(raw) {
   if (!raw) return { codigo: '', numero: '' };
@@ -56,9 +85,9 @@ function parseTelefono(raw) {
 }
 
 function parseAddress(address1, address2) {
-  let calle = '', numero = '', piso = '', depto = '';
   const a1 = address1 || '';
   const a2 = address2 || '';
+  let calle = '', numero = '', piso = '', depto = '';
   const matchNum = a1.match(/^(.*?)\s+(\d+[a-zA-Z]?)(?:\s+(.*))?$/);
   if (matchNum) {
     calle = matchNum[1].trim();
@@ -136,19 +165,12 @@ app.get('/api/orders', async (req, res) => {
 
 app.post('/api/generate-xlsx', async (req, res) => {
   if (!req.session.accessToken) return res.status(401).json({ error: 'No autenticado' });
-  const { orders, peso, alto, ancho, profundidad } = req.body;
+  const { orders } = req.body;
   if (!orders || !orders.length) return res.status(400).json({ error: 'No hay pedidos' });
 
-  // Valores de medidas enviados desde el frontend
-  const pesoVal = parseFloat(peso) || 200;
-  const altoVal = parseFloat(alto) || 10;
-  const anchoVal = parseFloat(ancho) || 10;
-  const profVal = parseFloat(profundidad) || 3;
-
   const workbook = new ExcelJS.Workbook();
-  const sheet = workbook.addWorksheet('EnvioMasivoExcelPaquetes');
+  const sheet = workbook.addWorksheet('A domicilio');
 
-  // Fila 1: grupos
   sheet.mergeCells('A1:G1'); sheet.getCell('A1').value = 'Características';
   sheet.mergeCells('H1:M1'); sheet.getCell('H1').value = 'Destinatario';
   sheet.mergeCells('N1:R1'); sheet.getCell('N1').value = 'Domicilio destino';
@@ -160,12 +182,11 @@ app.post('/api/generate-xlsx', async (req, res) => {
     sheet.getCell(cell).alignment = { horizontal: 'center' };
   });
 
-  // Fila 2: encabezados
   const headers = [
-    'Paquete Guardado', 'Peso (grs)', 'Alto (cm)', 'Ancho (cm)',
-    'Profundidad (cm)', 'Valor declarado ($ C/IVA)', 'Numero Interno',
-    'Nombre', 'Apellido', 'DNI', 'Email', 'Celular código', 'Celular número',
-    'Calle', 'Número', 'Piso', 'Departamento', 'Provincia / Localidad / CP', 'Observaciones'
+    'Paquete Guardado', 'Peso (grs)', 'Alto (cm)', 'Ancho (cm)', 'Profundidad (cm)',
+    'Valor declarado ($ C/IVA)', 'Numero Interno', 'Nombre', 'Apellido', 'DNI',
+    'Email', 'Celular código', 'Celular número', 'Calle', 'Número', 'Piso',
+    'Departamento', 'Provincia / Localidad / CP', 'Observaciones'
   ];
 
   const headerRow = sheet.getRow(2);
@@ -175,46 +196,34 @@ app.post('/api/generate-xlsx', async (req, res) => {
     cell.font = { bold: true };
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9E1F2' } };
     cell.alignment = { horizontal: 'center', wrapText: true };
-    cell.border = {
-      top: { style: 'thin' }, bottom: { style: 'thin' },
-      left: { style: 'thin' }, right: { style: 'thin' }
-    };
+    cell.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
   });
   headerRow.height = 35;
 
-  const colWidths = [18,12,10,10,14,22,15,15,15,12,28,14,16,22,10,8,12,35,20];
+  const colWidths = [18, 12, 10, 10, 14, 22, 15, 15, 15, 12, 28, 14, 16, 22, 10, 8, 12, 35, 20];
   colWidths.forEach((w, i) => { sheet.getColumn(i + 1).width = w; });
 
-  // Datos
   orders.forEach((o, idx) => {
     const addr = o.shipping_address || o.billing_address || {};
     const { calle, numero, piso, depto } = parseAddress(addr.address1, addr.address2);
     const tel = parseTelefono(addr.phone || o.phone || o.customer?.phone);
-    const provinciaCode = addr.province_code || addr.province || '';
-    const provinciaNombre = PROVINCIAS[provinciaCode.toUpperCase()] || provinciaCode.toUpperCase();
-    const localidad = (addr.city || '').toUpperCase();
-    const cp = (addr.zip || '').replace(/'/g, '').trim();
-    const provinciaLocalidadCP = `${provinciaNombre} / ${localidad} / ${cp}`;
+    const provinciaLocalidadCP = buscarLocalidadAndreani(
+      addr.province_code || addr.province || '',
+      addr.city || '',
+      addr.zip || ''
+    );
 
     const dataRow = sheet.getRow(idx + 3);
     const values = [
-      'PAQUETE',
-      pesoVal,
-      altoVal,
-      anchoVal,
-      profVal,
+      'PAQUETE', 200, 10, 10, 3,
       parseFloat(o.total_price) || '',
       String(o.order_number || '').replace('#', ''),
       addr.first_name || o.customer?.first_name || '',
       addr.last_name || o.customer?.last_name || '',
       '',
       o.email || o.customer?.email || '',
-      tel.codigo,
-      tel.numero,
-      calle,
-      numero,
-      piso,
-      depto,
+      tel.codigo, tel.numero,
+      calle, numero, piso, depto,
       provinciaLocalidadCP,
       ''
     ];
@@ -229,9 +238,7 @@ app.post('/api/generate-xlsx', async (req, res) => {
         left: { style: 'thin', color: { argb: 'FFD0D0D0' } },
         right: { style: 'thin', color: { argb: 'FFD0D0D0' } }
       };
-      if (idx % 2 === 1) {
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF5F5F5' } };
-      }
+      if (idx % 2 === 1) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF5F5F5' } };
     });
     dataRow.height = 20;
   });
@@ -243,10 +250,7 @@ app.post('/api/generate-xlsx', async (req, res) => {
   res.end();
 });
 
-app.post('/api/generate-csv', (req, res) => {
-  res.redirect(307, '/api/generate-xlsx');
-});
-
+app.post('/api/generate-csv', (req, res) => { res.redirect(307, '/api/generate-xlsx'); });
 app.get('/logout', (req, res) => { req.session.destroy(); res.redirect('/'); });
 
 const PORT = process.env.PORT || 3000;
