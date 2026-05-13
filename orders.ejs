@@ -262,7 +262,7 @@ async function exportCSV() {
 
   if (!selected.length) return;
 
-  const res = await fetch('/api/generate-csv', {
+  const res = await fetch('/api/generate-xlsx, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ orders: selected })
@@ -272,7 +272,7 @@ async function exportCSV() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `andreani_${new Date().toISOString().slice(0,10)}.csv`;
+  a.download = `andreani_${new Date().toISOString().slice(0,10)}.xlsx`;
   a.click();
   URL.revokeObjectURL(url);
 }
