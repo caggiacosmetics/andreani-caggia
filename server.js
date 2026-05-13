@@ -146,7 +146,7 @@ app.post('/api/generate-xlsx', async (req, res) => {
   const profVal = parseFloat(profundidad) || 3;
 
   const workbook = new ExcelJS.Workbook();
-  const sheet = workbook.addWorksheet('A domicilio');
+  const sheet = workbook.addWorksheet('EnvioMasivoExcelPaquetes');
 
   // Fila 1: grupos
   sheet.mergeCells('A1:G1'); sheet.getCell('A1').value = 'Características';
