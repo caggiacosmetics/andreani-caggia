@@ -70,7 +70,10 @@ for idx, o in enumerate(orders):
     ws.cell(row, 3).value  = None
     ws.cell(row, 4).value  = None
     ws.cell(row, 5).value  = None
-    ws.cell(row, 6).value  = float(o.get('total_price') or 0)
+try:
+    ws.cell(row, 6).value = float(str(o.get('total_price') or '0').replace(',', '.').replace(' ', '') or '0')
+except:
+    ws.cell(row, 6).value = 0.0
     ws.cell(row, 7).value  = str(o.get('order_number','')).replace('#','')
     ws.cell(row, 8).value  = addr.get('first_name') or customer.get('first_name','')
     ws.cell(row, 9).value  = addr.get('last_name') or customer.get('last_name','')
