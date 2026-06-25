@@ -3,8 +3,7 @@ import sys, json, re, os
 import openpyxl
 data = json.loads(sys.stdin.read())
 orders = data['orders']
-with open(os.path.join(os.path.dirname(__file__), 'localidades_andreani.json')) as f:
-    localidades = json.load(f)
+localidades = data['localidades']
 PROVINCIAS = {
   'A': 'SALTA', 'B': 'BUENOS AIRES', 'C': 'CIUDAD AUTONOMA DE BUENOS AIRES',
   'D': 'SAN LUIS', 'E': 'ENTRE RIOS', 'F': 'LA RIOJA', 'G': 'SANTIAGO DEL ESTERO',
