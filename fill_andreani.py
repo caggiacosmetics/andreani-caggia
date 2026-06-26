@@ -54,6 +54,10 @@ def parse_addr(a1, a2):
         depto = re.search(r'[Dd]pto\.?\s*([A-Za-z0-9]+)', resto) or re.search(r'[Dd]pto\.?\s*([A-Za-z0-9]+)', a2)
         return calle, num, piso.group(1) if piso else '', depto.group(1) if depto else ''
     return a1.strip(), '0', '', ''
+def limpiar(texto):
+    texto = texto.replace('—', '-').replace('–', '-')
+    texto = re.sub(r'[^\w\s\.,\(\):/\-]', '', texto)
+    return texto.strip()
 wb = openpyxl.load_workbook(os.path.join(os.path.dirname(__file__), 'plantilla_andreani (1).xlsx'))
 ws = wb['A domicilio']
 for idx, o in enumerate(orders):
@@ -87,6 +91,6 @@ for idx, o in enumerate(orders):
     ws.cell(row, 17).value = depto
     ws.cell(row, 18).value = loc_val
     items = o.get('line_items', [])
-    detalle = ', '.join(f"{item.get('name', '')} x{item.get('quantity', 1)}" for item in items)
+    detalle = ', '.join(f"{limpiar(item.get('name', ''))} x{item.get('quantity', 1)}" for item in items)
     ws.cell(row, 19).value = detalle
 wb.save(sys.stdout.buffer)
