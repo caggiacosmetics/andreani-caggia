@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import sys, json, re, os
+import sys, json, re, os, unicodedata
 import openpyxl
 data = json.loads(sys.stdin.read())
 orders = data['orders']
@@ -56,6 +56,8 @@ def parse_addr(a1, a2):
     return a1.strip(), '0', '', ''
 def limpiar(texto):
     texto = texto.replace('—', '-').replace('–', '-')
+    texto = unicodedata.normalize('NFD', texto)
+    texto = ''.join(c for c in texto if unicodedata.category(c) != 'Mn')
     texto = re.sub(r'[^\w\s\.,\(\):/\-]', '', texto)
     return texto.strip()
 wb = openpyxl.load_workbook(os.path.join(os.path.dirname(__file__), 'plantilla_andreani (1).xlsx'))
