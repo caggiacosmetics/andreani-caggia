@@ -87,6 +87,6 @@ for idx, o in enumerate(orders):
     ws.cell(row, 17).value = depto
     ws.cell(row, 18).value = loc_val
     items = o.get('line_items', [])
-    detalle = ' | '.join(f"{item.get('name', '')} x{item.get('quantity', 1)}" for item in items)
+    detalle = ', '.join(f"{item.get('name', '')} x{item.get('quantity', 1)}" for item in items)
     ws.cell(row, 19).value = detalle
 wb.save(sys.stdout.buffer)
